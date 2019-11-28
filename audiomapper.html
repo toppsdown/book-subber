@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <title></title>
+</head>
+<body>
+ <button onclick='LocalStorageHelpers.clearFileText();'>Clear</button>
+ <button onclick='LocalStorageHelpers.saveFileText(textWorkingArea);'>Save</button>
+ <button onclick='LocalStorageHelpers.viewLocalStorage();'>View</button>
+
+ <p>Upload Audio</p>
+ <div id="message"></div>
+ <input id="audioinput" type="file" accept="audio/*"/>
+ <audio controls id="sample_media">
+ <p>Your browser does not support the audio tag</p>
+</audio>
+
+<div>
+ <p>Upload Text</p>
+ <input id="textinput" type="file" accept="text/*"/>
+ <p id="textnode"></p>
+</div>
+</body>
+
+
+<!-- Dev tool area -->
+<script type="text/javascript">
+ var textWorkingArea="";
+ var workingList=[];
+
+ function parseText(text){
+  var paragraphLines = text.split("\n");
+  var paragraphs = paragraphLines.map(createParagraph);
+  var paragraphs = rejectEmptyParagraphs(paragraphs);
+  return paragraphs;
+ }
+
+ function createParagraph(line){
+  return new Paragraph(line);
+ }
+
+ function textReport(){
+  return workingList.map(function (p) {
+   return p.report();
+  })
+ }
+
+ function loadTextWorkingArea(){
+  var textNode = document.querySelector('#textnode')
+  textWorkingArea = textNode.innerHTML
+  workingList = parseText(textWorkingArea)
+ }
+
+ function rejectEmptyParagraphs(pList){
+  return pList.filter( p => !p.isEmpty())
+ }
+
+</script>
+
+
+<!-- Paragraph Class Definition -->
+<script type="text/javascript">
+ const unusedPunc = ["\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", , "-", , "/", , "<", "=", ">", , "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~"]
+
+ const endingPuncPattern = new RegExp(/!|\.|\?/);
+ const pausePuncPattern = new RegExp(/,|:|;/);
+ const allStopsPattern = new RegExp(/!|\.|\?|,|:|;/);
+
+ class Paragraph {
+  constructor(text) {
+   this.text = text;
+  }
+
+  text(){
+   return this.text;
+  }
+
+  isEmpty(){
+   return this.wordCount() == 0;
+  }
+
+  report(){
+   return {
+    wordCount: this.wordCount(),
+    sentenceCount: this.sentenceCount(),
+    pauseCount: this.pauseCount()
+   }
+  }
+
+  wordCount(){
+   var s = this.text;
+   s = s.replace(/(^\s*)|(\s*$)/gi,"");//exclude  start and end white-space
+   s = s.replace(/[ ]{2,}/gi," ");//2 or more space to 1
+   s = s.replace(/\n /,"\n"); // exclude newline with a start spacing
+   return s.split(' ').filter(function(str){return str!="";}).length;
+  }
+
+  sentenceCount() {
+   var s = this.text;
+   return s.split(endingPuncPattern).filter(function(str){return str!="";}).length;
+  }
+
+  pauseCount(){
+   var s = this.text;
+   return s.split(pausePuncPattern).filter(function(str){return str!="";}).length;
+  }
+ }
+</script>
+
+
+<!-- Local Storage Helpers -->
+<script type="text/javascript">
+ class LocalStorageHelpers {
+  static saveFileText(text){
+   LocalStorageHelpers.safeguardLocalStorage(function(){
+    localStorage.workingText = text;
+   })
+  };
+
+  static clearFileText(){
+   LocalStorageHelpers.safeguardLocalStorage(function(){
+    localStorage.removeItem("workingText");
+   })
+  };
+
+  static viewLocalStorage(){
+   console.log(localStorage.workingText);
+  };
+
+  static loadSavedWorkIfPresent(){
+   LocalStorageHelpers.safeguardLocalStorage(function(){
+    if (localStorage.workingText !== "undefined"){
+     insertFileText(localStorage.workingText);
+    }
+   })
+  };
+
+  static safeguardLocalStorage(wrappedFunction){
+   if (typeof(Storage) !== "undefined") {
+    wrappedFunction();
+   } else {
+     console.log("no local storage support")
+   }
+  };
+ }
+</script>
+
+<!-- Input Loaders -->
+<script type="text/javascript">
+ function loadFileAudioPlayer() {
+  'use strict'
+   var URL = window.URL || window.webkitURL
+   var displayMessage = function (message, isError) {
+     var element = document.querySelector('#message')
+     element.innerHTML = message
+     element.className = isError ? 'error' : 'info'
+   }
+   var playSelectedFile = function (event) {
+     var file = this.files[0]
+     var type = file.type
+     var audioNode = document.querySelector('audio')
+     var canPlay = audioNode.canPlayType(type)
+     if (canPlay === '') canPlay = 'no'
+     var message = 'Can play type "' + type + '": ' + canPlay
+     var isError = canPlay === 'no'
+     displayMessage(message, isError)
+
+     if (isError) {
+       return
+     }
+
+     var fileURL = URL.createObjectURL(file)
+     audioNode.src = fileURL
+   }
+   var inputNode = document.querySelector('#audioinput')
+   inputNode.addEventListener('change', playSelectedFile, false)
+ };
+
+ function loadFileTextLoad() {
+  'use strict'
+   var URL = window.URL || window.webkitURL
+
+   var loadSelectedFile = function (event) {
+    var file = this.files[0]
+    var textNode = document.querySelector('#textnode')
+    file.text().then(insertFileText)
+   }
+
+   var inputNode = document.querySelector('#textinput')
+   inputNode.addEventListener('change', loadSelectedFile, false)
+ };
+
+ function insertFileText(text){
+  var textNode = document.querySelector('#textnode')
+  textNode.innerHTML = text   
+  loadTextWorkingArea()
+ }
+</script>
+
+<!-- Startup executions -->
+<script type="text/javascript">
+ loadFileAudioPlayer();
+ loadFileTextLoad();
+ LocalStorageHelpers.loadSavedWorkIfPresent();
+</script>
+
+
+</html>
