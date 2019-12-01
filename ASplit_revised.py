@@ -4,10 +4,11 @@ import numpy
 
 FFMPEG_BIN = "ffmpeg"
 
-print 'ASplit.py <src.mp3> <silence duration in seconds> <thresheshold amplitude 0.0 .. 1.0>'
+print 'ASplit.py <src.mp3> <silence duration in miliseconds> <thresheshold amplitude 0.0 .. 1.0>'
 
 src = sys.argv[1]
-duration_s = float(sys.argv[2])
+duration_ms = float(sys.argv[2])
+duration_s = duration_ms/1000
 
 max_amplitude = 65535
 threshold = int(float(sys.argv[3]) * max_amplitude)
