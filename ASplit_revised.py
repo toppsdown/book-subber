@@ -1,3 +1,10 @@
+# Revised version of: https://stackoverflow.com/a/57126101
+#   - Mostly code readability changes.  You can test logic against original with ASplit_test_script.sh
+# Problems with this version:
+#   - The threshold is incorrect, it should be 1/2 of 65535
+#   - The script outputs clips of silence (length of passed duration)
+#
+
 import subprocess as sp
 import sys
 import numpy
