@@ -12,7 +12,7 @@ import numpy
 FFMPEG_BIN = "ffmpeg"
 OUTPUT_FORMAT = 'ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n'
 
-print 'ASplit.py <src.mp3> <silence duration in miliseconds> <thresheshold amplitude 0.0 .. 1.0>'
+print 'ASplit.py <src.m4a> <silence duration in miliseconds> <thresheshold amplitude 0.0 .. 1.0>'
 
 src = sys.argv[1]
 duration_ms = float(sys.argv[2])
