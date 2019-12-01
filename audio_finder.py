@@ -3,16 +3,21 @@
 #  - fix bugs
 #  - output timestamps for each line of audio for consumption by othe program
 
+
+# Ok, now I want it to be analyzed at 100ms, but duration is flexible
+
 import subprocess as sp
 import sys
 import numpy
 import pdb
+from circle_buffer import CircleBuffer
 
 FFMPEG_BIN = "ffmpeg"
 OUTPUT_FORMAT = 'ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n'
 
-def output_string(audio_type, start_s, end_s):
-    return '[%s,%f,%f]\n' % (audio_type, start_s, end_s)
+def output_to_file(f,audio_type,src, start_s, end_s, file_count):
+    f.write(OUTPUT_FORMAT % (src, start_s, end_s, src, file_count))
+    f.write('[%s,%f,%f]\n' % (audio_type, start_s, end_s))
 
 
 print 'audio_finder.py <src.m4a> <silence duration in miliseconds> <thresheshold amplitude 0.0 .. 1.0>'
@@ -28,6 +33,7 @@ f = open('%s-audio_timestamps.txt' % src, 'wb')
 
 sample_rate = 22050
 num_samples_in_set = duration_s * sample_rate
+num_samples_in_set = 0.1 * sample_rate
 
 buflen = int(num_samples_in_set * 2)
 #            t * rate * 16 bits
@@ -50,9 +56,24 @@ pipe = sp.Popen(command, stdout=sp.PIPE, bufsize=10**8)
 current_processing_timestamp = 0
 sample_start_timestamp = 0
 audio_segment_count = 1
+audio_type = ''
 
 is_current_silence = None
 is_past_silence = None
+
+
+circle_buffer_size = 5
+audio_analysis_buffer = CircleBuffer(circle_buffer_size)
+
+# Preload CircleBuffer
+for x in range(circle_buffer_size-1):
+    raw = pipe.stdout.read(buflen)
+    if raw == '' :
+        output_to_file(f,audio_type,src, sample_start_timestamp, current_processing_timestamp, audio_segment_count)
+        break
+    current_sample_set = numpy.fromstring(raw, dtype = "int16")
+    audio_analysis_buffer.insert(current_sample_set)
+
 
 while True :
 
@@ -60,7 +81,8 @@ while True :
 
     # If end of file, close program
     if raw == '' :
-        f.write(OUTPUT_FORMAT % (src, sample_start_timestamp, current_processing_timestamp, src, audio_segment_count))
+        # Probably need to increase the processing time to the end of the file
+        output_to_file(f,audio_type,src, sample_start_timestamp, current_processing_timestamp, audio_segment_count)
         break
 
     # when 2 bytes are used for audio samples, need to order bytes
@@ -72,13 +94,15 @@ while True :
     # numpy.fromstring("\x00\x80", dtype = "int16") # => -32768
     # numpy.fromstring("\x00\x80\x00\x80", dtype = "int16") # => [-32768,-32768]
     current_sample_set = numpy.fromstring(raw, dtype = "int16")
+    audio_analysis_buffer.insert(current_sample_set)
 
     # Because this is a waveform, each sample is just volume
     # Get the maximum absolute value within the range
-    max_amplitude = numpy.amax(current_sample_set)
+    analysis_range = numpy.concatenate(audio_analysis_buffer.data)
+    max_amplitude = numpy.amax(analysis_range)
 
     # Threshold is calculated based on percentage of range
-    # the peak in this range is less than the thresheshold value
+    # the peak in this range is less than the threshold value
     if max_amplitude <= threshold :
         is_current_silence = True
     else:
@@ -87,8 +111,7 @@ while True :
     if is_current_silence != is_past_silence:
         audio_type = "silence" if is_past_silence else "audio"
         sample_end_timestamp = current_processing_timestamp + duration_s
-        f.write(OUTPUT_FORMAT % (src, sample_start_timestamp, sample_end_timestamp, src, audio_segment_count))
-        f.write(output_string(audio_type, sample_start_timestamp, sample_end_timestamp))
+        output_to_file(f,audio_type,src, sample_start_timestamp, current_processing_timestamp, audio_segment_count)
 
         # move to next section of audio
         sample_start_timestamp = sample_end_timestamp
