@@ -26,7 +26,7 @@ f = open('%s-out_revised.txt' % src, 'wb')
 sample_rate = 22050
 num_samples_in_set = duration_s * sample_rate
 
-# create a buffer length that can take two samples of given duration
+# create buffer of the appropriate size for a sample_set
 buflen = int(num_samples_in_set     * 2)
 #            t * rate * 16 bits
 
