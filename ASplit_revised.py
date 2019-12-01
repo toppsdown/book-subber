@@ -3,6 +3,7 @@ import sys
 import numpy
 
 FFMPEG_BIN = "ffmpeg"
+OUTPUT_FORMAT = 'ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n'
 
 print 'ASplit.py <src.mp3> <silence duration in miliseconds> <thresheshold amplitude 0.0 .. 1.0>'
 
@@ -41,12 +42,11 @@ command = [ FFMPEG_BIN,
 
 pipe = sp.Popen(command, stdout=sp.PIPE, bufsize=10**8)
 
-tf = True
 current_processing_timestamp = 0
 sample_start_timestamp = 0
-audio_segment_count = 0
+audio_segment_count = 1
 
-while tf :
+while True :
 
     # grab 2x sample set duration from the pipe
     # Eg. if duration is 1 sec, take two seconds of audio
@@ -55,7 +55,7 @@ while tf :
 
     # If end of file, close program
     if raw == '' :
-        tf = False
+        f.write(OUTPUT_FORMAT % (src, sample_start_timestamp, current_processing_timestamp, src, audio_segment_count))
         break
 
     # when 2 bytes are used for audio samples, need to order bytes
@@ -79,17 +79,16 @@ while tf :
     # Threshold is calculated based on percentage of range
     # the peak in this range is less than the thresheshold value
     if max_amplitude <= threshold :
-        num_samples_below_threshold = numpy.size(rng)
-        audio_segment_count += 1
         sample_end_timestamp = current_processing_timestamp + duration_s * 0.5
-        print max_amplitude, num_samples_below_threshold, num_samples_in_set, sample_end_timestamp
-        f.write('ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n' % (src, sample_start_timestamp, sample_end_timestamp, src, audio_segment_count))
+        f.write(OUTPUT_FORMAT % (src, sample_start_timestamp, sample_end_timestamp, src, audio_segment_count))
+
+        # move to next file
         sample_start_timestamp = sample_end_timestamp
+        audio_segment_count += 1
 
+    # move to next sample
     current_processing_timestamp += duration_s
-
     last_sample_set = current_sample_set
 
-audio_segment_count += 1
-f.write('ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n' % (src, sample_start_timestamp, current_processing_timestamp, src, audio_segment_count))
+
 f.close()
