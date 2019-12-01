@@ -78,17 +78,12 @@ while tf :
     # Threshold is calculated based on percentage of range
     # the peak in this range is less than the thresheshold value
     if max_amplitude <= threshold :
-        # the peak in this range is less than the threshold value
-        trng = (rng <= threshold) * 1
-        # effectively a pass filter with all samples <= thr set to 0 and > thr set to 1
-        num_samples_below_threshold = numpy.sum(trng)
-        # i.e. simply (naively) check how many 1's there were
-        if num_samples_below_threshold >= num_samples_in_set :
-            audio_segment_count += 1
-            sample_end_timestamp = current_processing_timestamp + duration_s * 0.5
-            print max_amplitude, num_samples_below_threshold, num_samples_in_set, sample_end_timestamp
-            f.write('ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n' % (src, sample_start_timestamp, sample_end_timestamp, src, audio_segment_count))
-            sample_start_timestamp = sample_end_timestamp
+        num_samples_below_threshold = numpy.size(rng)
+        audio_segment_count += 1
+        sample_end_timestamp = current_processing_timestamp + duration_s * 0.5
+        print max_amplitude, num_samples_below_threshold, num_samples_in_set, sample_end_timestamp
+        f.write('ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n' % (src, sample_start_timestamp, sample_end_timestamp, src, audio_segment_count))
+        sample_start_timestamp = sample_end_timestamp
 
     current_processing_timestamp += duration_s
 
