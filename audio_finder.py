@@ -2,6 +2,8 @@
 # Goals:
 #  - output timestamps for each line of audio for consumption by other program
 
+# For Harry Potter, duration 300ms with 20ms granularity seems to work well
+
 import subprocess as sp
 import sys
 import numpy
@@ -14,9 +16,9 @@ OUTPUT_FORMAT = 'ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n'
 print 'audio_finder.py <src.m4a> <silence duration in miliseconds> <granularity ms> <thresheshold amplitude 0.0 .. 1.0>'
 
 def output_to_file(f,audio_type,src, start_s, end_s, file_count):
-    # if audio_type == "audio":
-        # f.write(OUTPUT_FORMAT % (src, start_s, end_s, src, file_count))
-    f.write('[%s,%f,%f]\n' % (audio_type, start_s, end_s))
+    if audio_type == "audio":
+        f.write(OUTPUT_FORMAT % (src, start_s, end_s, src, file_count))
+    # f.write('[%s,%f,%f]\n' % (audio_type, start_s, end_s))
 
 src = sys.argv[1]
 
