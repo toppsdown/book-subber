@@ -1,7 +1,6 @@
 # Based on: https://stackoverflow.com/a/57126101
 # Goals:
-#  - fix bugs
-#  - output timestamps for each line of audio for consumption by othe program
+#  - output timestamps for each line of audio for consumption by other program
 
 import subprocess as sp
 import sys
