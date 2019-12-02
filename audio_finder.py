@@ -15,12 +15,12 @@ from circle_buffer import CircleBuffer
 FFMPEG_BIN = "ffmpeg"
 OUTPUT_FORMAT = 'ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n'
 
-def output_to_file(f,audio_type,src, start_s, end_s, file_count):
-    f.write(OUTPUT_FORMAT % (src, start_s, end_s, src, file_count))
-    f.write('[%s,%f,%f]\n' % (audio_type, start_s, end_s))
-
-
 print 'audio_finder.py <src.m4a> <silence duration in miliseconds> <thresheshold amplitude 0.0 .. 1.0>'
+
+def output_to_file(f,audio_type,src, start_s, end_s, file_count):
+    if audio_type == "audio":
+        f.write(OUTPUT_FORMAT % (src, start_s, end_s, src, file_count))
+    # f.write('[%s,%f,%f]\n' % (audio_type, start_s, end_s))
 
 src = sys.argv[1]
 duration_ms = float(sys.argv[2])
@@ -32,11 +32,20 @@ threshold = int(float(sys.argv[3]) * max_amplitude)
 f = open('%s-audio_timestamps.txt' % src, 'wb')
 
 sample_rate = 22050
-num_samples_in_set = duration_s * sample_rate
-num_samples_in_set = 0.1 * sample_rate
+granularity = 5 # analyze the audio at intervals of 1/5th the duration
+analysis_size = duration_s/granularity
+num_samples_in_set = analysis_size * sample_rate
 
 buflen = int(num_samples_in_set * 2)
 #            t * rate * 16 bits
+
+# Total analysis buffer is the duration, each section is the granularity
+circle_buffer_size = granularity
+audio_analysis_buffer = CircleBuffer(circle_buffer_size)
+
+# preload the circlebuffer with empty data
+for x in range(circle_buffer_size-1):
+    audio_analysis_buffer.insert([0])
 
 # s16le audiotype:
 # PCM signed 16-bit little-endian
@@ -61,22 +70,7 @@ audio_type = ''
 is_current_silence = None
 is_past_silence = None
 
-
-circle_buffer_size = 5
-audio_analysis_buffer = CircleBuffer(circle_buffer_size)
-
-# Preload CircleBuffer
-for x in range(circle_buffer_size-1):
-    raw = pipe.stdout.read(buflen)
-    if raw == '' :
-        output_to_file(f,audio_type,src, sample_start_timestamp, current_processing_timestamp, audio_segment_count)
-        break
-    current_sample_set = numpy.fromstring(raw, dtype = "int16")
-    audio_analysis_buffer.insert(current_sample_set)
-
-
 while True :
-
     raw = pipe.stdout.read(buflen)
 
     # If end of file, close program
@@ -110,7 +104,7 @@ while True :
 
     if is_current_silence != is_past_silence:
         audio_type = "silence" if is_past_silence else "audio"
-        sample_end_timestamp = current_processing_timestamp + duration_s
+        sample_end_timestamp = current_processing_timestamp + analysis_size
         output_to_file(f,audio_type,src, sample_start_timestamp, current_processing_timestamp, audio_segment_count)
 
         # move to next section of audio
@@ -119,7 +113,7 @@ while True :
         is_past_silence = is_current_silence
 
     # move to next sample
-    current_processing_timestamp += duration_s
+    current_processing_timestamp += analysis_size
 
 
 f.close()
