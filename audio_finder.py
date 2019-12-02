@@ -102,6 +102,9 @@ while True :
     else:
         is_current_silence = False
 
+    if is_past_silence == None:
+        is_past_silence = is_current_silence
+
     if is_current_silence != is_past_silence:
         audio_type = "silence" if is_past_silence else "audio"
         sample_end_timestamp = current_processing_timestamp + analysis_size
