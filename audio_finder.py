@@ -3,9 +3,6 @@
 #  - fix bugs
 #  - output timestamps for each line of audio for consumption by othe program
 
-
-# Ok, now I want it to be analyzed at 100ms, but duration is flexible
-
 import subprocess as sp
 import sys
 import numpy
@@ -15,32 +12,50 @@ from circle_buffer import CircleBuffer
 FFMPEG_BIN = "ffmpeg"
 OUTPUT_FORMAT = 'ffmpeg -i "%s" -ss %f -to %f -c copy -y "%s-p%04d.m4a"\r\n'
 
-print 'audio_finder.py <src.m4a> <silence duration in miliseconds> <thresheshold amplitude 0.0 .. 1.0>'
+print 'audio_finder.py <src.m4a> <silence duration in miliseconds> <granularity ms> <thresheshold amplitude 0.0 .. 1.0>'
 
 def output_to_file(f,audio_type,src, start_s, end_s, file_count):
-    if audio_type == "audio":
-        f.write(OUTPUT_FORMAT % (src, start_s, end_s, src, file_count))
-    # f.write('[%s,%f,%f]\n' % (audio_type, start_s, end_s))
+    # if audio_type == "audio":
+        # f.write(OUTPUT_FORMAT % (src, start_s, end_s, src, file_count))
+    f.write('[%s,%f,%f]\n' % (audio_type, start_s, end_s))
 
 src = sys.argv[1]
-duration_ms = float(sys.argv[2])
-duration_s = duration_ms/1000
+
+# Note, if granularity doesn't divide neatly into duration
+# duration will get shorter from downrounding in duration_ms/granularity_ms
+duration_ms = int(sys.argv[2])
+granularity_ms = int(sys.argv[3])
 
 max_amplitude = 65535/2
-threshold = int(float(sys.argv[3]) * max_amplitude)
+threshold = int(float(sys.argv[4]) * max_amplitude)
 
 f = open('%s-audio_timestamps.txt' % src, 'wb')
 
-sample_rate = 22050
-granularity = 5 # analyze the audio at intervals of 1/5th the duration
-analysis_size = duration_s/granularity
-num_samples_in_set = analysis_size * sample_rate
+# there's a problem here with the granularity.  If it doesn't neatly divide 22050
+# then it causes problems.  calc: 50/1000 => 1/20.  22050/20 => 1102.5
+# So what works?
+# Prime factors 22050: 2 * 3 * 3 * 5 * 5 * 7 * 7
+# Prime factors 1000: 2 * 2 * 2 * 5 * 5 * 5
+# Common factors: 2 * 5 * 5
+
+acceptable_granularities = [500, 200, 100, 40, 20]
+if not granularity_ms in acceptable_granularities:
+    sys.exit("Granularity must be one of: 500, 200, 100, 40, 20")
+
+if granularity_ms > duration_ms:
+    sys.exit("Granularity cannot be larger than duration")
+
+sample_rate = 22050 # per second
+granularity_s = granularity_ms/1000.0
+analysis_buffer_size = duration_ms/granularity_ms
+
+num_samples_in_set = granularity_s * sample_rate
 
 buflen = int(num_samples_in_set * 2)
 #            t * rate * 16 bits
 
 # Total analysis buffer is the duration, each section is the granularity
-circle_buffer_size = granularity
+circle_buffer_size = analysis_buffer_size
 audio_analysis_buffer = CircleBuffer(circle_buffer_size)
 
 # preload the circlebuffer with empty data
@@ -107,7 +122,7 @@ while True :
 
     if is_current_silence != is_past_silence:
         audio_type = "silence" if is_past_silence else "audio"
-        sample_end_timestamp = current_processing_timestamp + analysis_size
+        sample_end_timestamp = current_processing_timestamp + granularity_s
         output_to_file(f,audio_type,src, sample_start_timestamp, current_processing_timestamp, audio_segment_count)
 
         # move to next section of audio
@@ -116,7 +131,7 @@ while True :
         is_past_silence = is_current_silence
 
     # move to next sample
-    current_processing_timestamp += analysis_size
+    current_processing_timestamp += granularity_s
 
 
 f.close()

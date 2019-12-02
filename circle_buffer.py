@@ -3,7 +3,7 @@ class CircleBuffer:
 
     def __init__(self, size):
         self.size = size
-        self.data = [0] * self.size
+        self.data = [None] * size
         self.current_pointer = 0
 
     def insert(self,new_data):
